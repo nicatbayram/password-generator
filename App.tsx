@@ -1,118 +1,214 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useState } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
+import { Formik } from 'formik';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+import { PasswordOptions } from './components/PasswordOptions';
+import { PasswordResult } from './components/PasswordResult';
+import { generatePassword } from './utils/passwordGenerator';
+import { PasswordSchema } from './validation/passwordSchema';
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+export default function App() {
+  const [password, setPassword] = useState('');
+  const [isPassGenerated, setIsPassGenerated] = useState(false);
+  const [lowerCase, setLowerCase] = useState(true);
+  const [upperCase, setUpperCase] = useState(false);
+  const [numbers, setNumbers] = useState(false);
+  const [symbols, setSymbols] = useState(false);
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const handleGeneratePassword = (passwordLength: number) => {
+    try {
+      const newPassword = generatePassword({
+        length: passwordLength,
+        includeUpperCase: upperCase,
+        includeLowerCase: lowerCase,
+        includeNumbers: numbers,
+        includeSymbols: symbols,
+      });
+      
+      setPassword(newPassword);
+      setIsPassGenerated(true);
+    } catch (error) {
+      if (error instanceof Error) {
+        Alert.alert('Hata', error.message);
+      }
+    }
+  };
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const resetPasswordState = () => {
+    setPassword('');
+    setIsPassGenerated(false);
+    setLowerCase(true);
+    setUpperCase(false);
+    setNumbers(false);
+    setSymbols(false);
+  };
+
+  const copyToClipboard = () => {
+    if (password) {
+      Clipboard.setString(password);
+      Alert.alert('Başarılı', 'Şifre panoya kopyalandı!');
+    } else {
+      Alert.alert('Hata', 'Kopyalanacak şifre yok');
+    }
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
+    <ScrollView keyboardShouldPersistTaps="handled">
+      <SafeAreaView style={styles.appContainer}>
+        <View style={styles.formContainer}>
+          <Text style={styles.title}>Password Generator</Text>
+          <Formik
+            initialValues={{ passwordLength: '' }}
+            validationSchema={PasswordSchema}
+            onSubmit={(values) => {
+              handleGeneratePassword(+values.passwordLength);
+            }}
+          >
+            {({
+              values,
+              errors,
+              touched,
+              isValid,
+              handleChange,
+              handleSubmit,
+              handleReset,
+            }) => (
+              <>
+                <View style={styles.inputWrapper}>
+                  <View style={styles.inputColumn}>
+                    <Text style={styles.heading}>Password Length</Text>
+                    {touched.passwordLength && errors.passwordLength && (
+                      <Text style={styles.errorText}>{errors.passwordLength}</Text>
+                    )}
+                  </View>
+                  <TextInput
+                    style={styles.inputStyle}
+                    value={values.passwordLength}
+                    onChangeText={handleChange('passwordLength')}
+                    placeholder="Ex. 8"
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <PasswordOptions
+                  lowerCase={lowerCase}
+                  upperCase={upperCase}
+                  numbers={numbers}
+                  symbols={symbols}
+                  onLowerCaseChange={setLowerCase}
+                  onUpperCaseChange={setUpperCase}
+                  onNumbersChange={setNumbers}
+                  onSymbolsChange={setSymbols}
+                />
+
+                <View style={styles.formActions}>
+                  <TouchableOpacity
+                    disabled={!isValid}
+                    style={[styles.primaryBtn, !isValid && styles.disabledBtn]}
+                    onPress={() => handleSubmit()}
+                  >
+                    <Text style={styles.primaryBtnTxt}>Generate</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    onPress={() => {
+                      handleReset();
+                      resetPasswordState();
+                    }}
+                  >
+                    <Text style={styles.secondaryBtnTxt}>Reset</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </Formik>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        
+        {isPassGenerated && (
+          <PasswordResult 
+            password={password}
+            onCopy={copyToClipboard}
+          />
+        )}
+      </SafeAreaView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  appContainer: {
+    flex: 1,
   },
-  sectionTitle: {
-    fontSize: 24,
+  formContainer: {
+    backgroundColor: '#e9eaec',
+    margin: 8,
+    padding: 8,
+  },
+  title: {
+    fontSize: 32,
     fontWeight: '600',
+    marginBottom: 15,
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
+  heading: {
+    fontSize: 19,
+    fontWeight: '500',  
   },
-  highlight: {
+  inputWrapper: {
+    marginBottom: 15,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+  },
+  inputColumn: {
+    flexDirection: 'column',
+  },
+  inputStyle: {
+    padding: 8,
+    width: '30%',
+    borderWidth: 1,
+    borderRadius: 4,
+    borderColor: '#16213e',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ff0d10',
+  },
+  formActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  primaryBtn: {
+    width: 120,
+    height: 50,
+    padding: 10,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    justifyContent: 'center',
+    backgroundColor: '#0b0b0b',
+  },
+  disabledBtn: {
+    opacity: 0.9,
+  },
+  primaryBtnTxt: {
+    color: '#e9eaec',
+    textAlign: 'center',
     fontWeight: '700',
   },
+  secondaryBtn: {
+    width: 120,
+    padding: 10,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    justifyContent: 'center',
+    backgroundColor: '#0b0b0b',
+    
+  },
+  secondaryBtnTxt: {
+    textAlign: 'center',
+    fontWeight: '700',
+    color: '#e9eaec',
+  },
 });
-
-export default App;
